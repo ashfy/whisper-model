@@ -1,0 +1,53 @@
+name: Ambil video
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Link TikTok / Instagram Reels / YouTube Shorts"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Siapkan alat
+        run: |
+          pip install -q -U yt-dlp
+          which ffmpeg || (sudo apt-get update -q && sudo apt-get install -y -q ffmpeg)
+
+      - name: Unduh video
+        env:
+          URL: ${{ inputs.url }}
+          COOKIES: ${{ secrets.COOKIES }}
+        run: |
+          EXTRA=""
+          if [ -n "$COOKIES" ]; then
+            printf '%s\n' "$COOKIES" > cookies.txt
+            EXTRA="--cookies cookies.txt"
+          fi
+          yt-dlp $EXTRA -S "res:720,ext:mp4" --merge-output-format mp4 \
+            --write-info-json -o "video.%(ext)s" "$URL"
+          jq '{url: .webpage_url, title, uploader, upload_date, duration, description, view_count, like_count}' \
+            video.info.json > latest.json
+          cat latest.json
+          ls -lh video.mp4
+
+      - name: Taruh di Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          N: ${{ github.run_number }}
+        run: |
+          gh release view videos --repo "$REPO" >/dev/null 2>&1 || \
+            gh release create videos --repo "$REPO" --title "Videos" \
+              --notes "Video yang diambil lewat workflow 'Ambil video'. latest.mp4 = video terbaru."
+          cp video.mp4 latest.mp4
+          cp video.mp4 "video-$N.mp4"
+          cp latest.json "video-$N.json"
+          gh release upload videos latest.mp4 latest.json "video-$N.mp4" "video-$N.json" \
+            --repo "$REPO" --clobber
+          echo "Selesai: video-$N.mp4"
