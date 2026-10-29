@@ -16,7 +16,7 @@ jobs:
     steps:
       - name: Siapkan alat
         run: |
-          pip install -q -U yt-dlp
+          pip install -q -U "yt-dlp[default,curl-cffi]"
           which ffmpeg || (sudo apt-get update -q && sudo apt-get install -y -q ffmpeg)
 
       - name: Unduh video
