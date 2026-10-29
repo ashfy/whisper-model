@@ -31,7 +31,20 @@ jobs:
           fi
           yt-dlp $EXTRA -S "res:720,ext:mp4" --merge-output-format mp4 \
             --write-info-json -o "video.%(ext)s" "$URL"
-          jq '{url: .webpage_url, title, uploader, upload_date, duration, description, view_count, like_count}' \
+          F=$(ls video.* | grep -v '\.info\.json$' | head -1)
+          AUDIO_ONLY=false
+          if [ "$F" != "video.mp4" ]; then
+            if ffprobe -v error -select_streams v -show_entries stream=index -of csv=p=0 "$F" | grep -q .; then
+              ffmpeg -y -loglevel error -i "$F" -c:v libx264 -c:a aac video.mp4
+            else
+              # Audio only (e.g. TikTok photo slideshow): wrap audio in a black video
+              AUDIO_ONLY=true
+              ffmpeg -y -loglevel error -f lavfi -i color=c=black:s=320x320:r=1 -i "$F" \
+                -shortest -c:v libx264 -tune stillimage -c:a aac video.mp4
+            fi
+          fi
+          jq --argjson ao $AUDIO_ONLY \
+            '{url: .webpage_url, title, uploader, upload_date, duration, description, view_count, like_count, audio_only: $ao}' \
             video.info.json > latest.json
           cat latest.json
           ls -lh video.mp4
