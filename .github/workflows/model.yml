@@ -1,0 +1,28 @@
+name: Siapkan model Whisper
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  upload-model:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Unduh model dari HuggingFace
+        run: |
+          pip install -q huggingface_hub
+          python -c "from huggingface_hub import snapshot_download; snapshot_download('Systran/faster-whisper-small', local_dir='faster-whisper-small')"
+          rm -rf faster-whisper-small/.cache
+          tar -czf faster-whisper-small.tar.gz faster-whisper-small
+          ls -lh faster-whisper-small.tar.gz
+
+      - name: Taruh di Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create model-v1 faster-whisper-small.tar.gz \
+            --repo "${{ github.repository }}" \
+            --title "faster-whisper small" \
+            --notes "Model untuk skill transkripsi video Claude"
